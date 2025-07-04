@@ -25,12 +25,10 @@ export const loginUserController = async (req: Request, res: Response):Promise<v
     const user = await User.findOne({ username });
 
     if (!user || !(await user.comparePassword(password))) {
-      res.status(401).json({ message: "Invalid username or password" });
+      res.status(401).json({ message: "Invalid Username or password" });
       return;
     }
-
     const token = await user.getAuthToken();
-
     res
       .cookie("token", token, {
         httpOnly: true,

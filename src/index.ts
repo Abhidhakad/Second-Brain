@@ -1,30 +1,46 @@
-import express from "express";
+import express, { json } from "express";
 import dotenv from "dotenv";
+import cors from "cors";
+import helmet from "helmet";
+import morgan from "morgan";
+import cookieParser from "cookie-parser";
+
 import { connectWithDb } from "./config/db";
 import authRouter from "./routes/authRoutes";
+import contentRouter from "./routes/contentRoutes";
 
 dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 8000;
 
+
 app.use(express.json());
-connectWithDb();
+app.use(cors({
+  origin: "http://localhost:5173",
+  credentials: true
+}));
 
-app.use("/api",authRouter);
+app.use(helmet());
+app.use(morgan("dev"));
+app.use(cookieParser());
+
+// DB connection
+connectWithDb().catch(err => {
+  console.error("Failed to connect to DB:", err);
+  process.exit(1);
+});
+
+// Routes
+app.use("/api/v1", authRouter);
+app.use("/api/v1",contentRouter);
 
 
+// Health check
+app.get("/home", (req, res) => {
+  res.send("Radhe Radhe 🙏");
+});
 
-
-
-
-app.get("/",(req,res)=>{
-    res.send("Radhe Radhe")
-})
-
-app.listen(port,()=> {
-    console.log("App is listening on port ",port);
-})
-
-
-
+app.listen(port, () => {
+  console.log(`✅ Server running at http://localhost:${port}`);
+});
