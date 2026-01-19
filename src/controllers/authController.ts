@@ -1,11 +1,6 @@
 import { Request, Response } from "express";
-import { z } from "zod";
+import { authSchema } from "../schemas/authSchems";
 import User from "../models/userModel";
-
-const authSchema = z.object({
-  username: z.string().min(3, "Username must be at least 3 characters long"),
-  password: z.string().min(6, "Password must be at least 6 characters long"),
-});
 
 
 export const loginUserController = async (req: Request, res: Response):Promise<void> => {
@@ -32,7 +27,7 @@ export const loginUserController = async (req: Request, res: Response):Promise<v
     res
       .cookie("token", token, {
         httpOnly: true,
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        maxAge: 7 * 24 * 60 * 60 * 1000, 
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
       })
@@ -54,7 +49,7 @@ export const signUpUserController = async (req: Request, res: Response):Promise<
     const result = authSchema.safeParse(req.body);
 
     if (!result.success) {
-      res.status(400).json({
+      res.status(411).json({
         success: false,
         message: "Validation failed",
         errors: result.error.flatten(),
@@ -66,7 +61,7 @@ export const signUpUserController = async (req: Request, res: Response):Promise<
 
     const existingUser = await User.findOne({ username });
     if (existingUser) {
-      res.status(409).json({
+      res.status(403).json({
         success: false,
         message: "User already exists",
       });

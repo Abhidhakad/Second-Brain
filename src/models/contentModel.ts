@@ -1,14 +1,25 @@
 import mongoose from "mongoose";
-import { string } from "zod";
 
-interface IContent extends Document {
-    title: string,
-    description:string
-    link: string,
+
+export enum ContentType {
+    DOCUMENT = "document",
+    TWEET = "tweet",
+    YOUTUBE = "youtube",
+    LINK = "link",
+    OTHERS = "others",
+}
+
+
+interface IContent {
+    title: string;
+    description: string;
+    link: string;
     tags: mongoose.Types.ObjectId[];
-    type?: string,
+    type?: ContentType;
     userId: mongoose.Types.ObjectId;
 }
+
+interface IContentDocument extends IContent, Document { }
 
 const contentSchema = new mongoose.Schema<IContent>({
     title: {
@@ -18,7 +29,7 @@ const contentSchema = new mongoose.Schema<IContent>({
         trim: true,
         index: true
     },
-    description:{
+    description: {
         type: String,
         required: [true, "Description is required"],
         maxLength: [1000, "description can`t exceed more than 1000 characters"],
@@ -26,7 +37,8 @@ const contentSchema = new mongoose.Schema<IContent>({
     },
     link: {
         type: String,
-
+        required: true,
+        trim: true
     },
     tags: [
         {
@@ -35,28 +47,38 @@ const contentSchema = new mongoose.Schema<IContent>({
         },
     ],
     type: {
-        type: String
+        type: String,
+        enum: Object.values(ContentType),
+        default: ContentType.OTHERS,
     },
     userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
-    required: [true, "UserId is required"],
-    index:true
-  },
-},{timestamps:true})
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        required: [true, "UserId is required"],
+        index: true
+    },
+}, { timestamps: true })
 
 export default mongoose.model<IContent>("Content", contentSchema);
 
 
 
-const TagSchema = new mongoose.Schema({
-    tagName:{
-        type:String,
-        unique:true,
-        required:true,
-        lowercase:true,
-        trim:true,
+
+
+
+
+interface ITag extends Document {
+    tagName: string
+}
+
+const TagSchema = new mongoose.Schema<ITag>({
+    tagName: {
+        type: String,
+        unique: true,
+        required: true,
+        lowercase: true,
+        trim: true,
     }
 })
 
-export const Tag = mongoose.model("Tag",TagSchema);
+export const Tag = mongoose.model<ITag>("Tag", TagSchema);

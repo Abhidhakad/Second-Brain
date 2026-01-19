@@ -3,6 +3,7 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 
 
+
 interface IUser {
   username: string;
   password: string;
@@ -47,10 +48,16 @@ userSchema.methods.comparePassword = async function (
   return bcrypt.compare(candidatePassword, this.password);
 };
 
-userSchema.methods.getAuthToken = async function () {
+
+userSchema.methods.getAuthToken = async function ():Promise<string> {
   try {
+
+    if (!process.env.JWT_SECRET) {
+    throw new Error("JWT_SECRET is not defined");
+  }
+
     let token = await jwt.sign(
-      { id: this._id },
+      { id: this._id.toString() },
       process.env.JWT_SECRET!,
       {
         expiresIn: "24h",

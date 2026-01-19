@@ -1,14 +1,16 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
-import { unknown } from "zod";
 
 export interface JwtPayload {
   id: string;
-  username: string;
 }
 
 
-export const verifyToken = (req: Request, res: Response, next: NextFunction) => {
+export const verifyToken = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
   try {
     const token =
       req.cookies?.token ||
@@ -19,12 +21,23 @@ export const verifyToken = (req: Request, res: Response, next: NextFunction) => 
       return;
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as JwtPayload;
-    req.user = decoded;
+    if (!process.env.JWT_SECRET) {
+      res.status(500).json({ message: "Server configuration error" });
+      return;
+    }
+
+    const decoded = jwt.verify(
+      token,
+      process.env.JWT_SECRET
+    ) as JwtPayload;
+
+    req.userId = decoded.id;
+
+
+    console.log(`Authenticated user ID: ${req.userId}`);
 
     next();
   } catch (error) {
     res.status(401).json({ message: "Invalid or expired token" });
-    return
   }
 };
