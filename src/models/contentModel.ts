@@ -17,9 +17,10 @@ interface IContent {
     tags: mongoose.Types.ObjectId[];
     type?: ContentType;
     userId: mongoose.Types.ObjectId;
+    public?: boolean;   
 }
 
-interface IContentDocument extends IContent, Document { }
+// interface IContentDocument extends IContent, Document { }
 
 const contentSchema = new mongoose.Schema<IContent>({
     title: {
@@ -57,6 +58,10 @@ const contentSchema = new mongoose.Schema<IContent>({
         required: [true, "UserId is required"],
         index: true
     },
+    public: {
+        type: Boolean,
+        default: false,
+    },
 }, { timestamps: true })
 
 export default mongoose.model<IContent>("Content", contentSchema);
@@ -82,3 +87,28 @@ const TagSchema = new mongoose.Schema<ITag>({
 })
 
 export const Tag = mongoose.model<ITag>("Tag", TagSchema);
+
+
+
+// link schema 
+interface IBrain extends Document {
+    hash: string;
+    userId: mongoose.Types.ObjectId;
+}
+
+export const brainSchema = new mongoose.Schema<IBrain>({
+    hash: {
+        type: String,
+        required: true,
+        trim: true,
+        unique: true,
+    },
+    userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        required: true,
+        unique: true,
+    },
+},{ timestamps: true }); 
+
+export const Brain = mongoose.model<IBrain>("Brain", brainSchema);

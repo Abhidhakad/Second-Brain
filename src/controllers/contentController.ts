@@ -1,9 +1,10 @@
 
 import { Response, Request } from "express";
 import Content from "../models/contentModel"
-import { Tag } from "../models/contentModel"
+import { Tag, Brain } from "../models/contentModel"
 import mongoose, { Types } from "mongoose";
 import { ContentInput, contentSchema } from "../schemas/contentSchema";
+import { generateLink } from "../utils/generateHash";
 
 
 
@@ -30,6 +31,8 @@ import { ContentInput, contentSchema } from "../schemas/contentSchema";
 //     return "Invalid URL";
 //   }
 // }
+
+
 
 export const createContent = async (req: Request, res: Response): Promise<void> => {
   const session = await mongoose.startSession();
@@ -65,7 +68,7 @@ export const createContent = async (req: Request, res: Response): Promise<void> 
       );
       tagIds.push(tag._id);
     }
-   const [newContent] = await Content.create(
+    const [newContent] = await Content.create(
       [
         {
           title: data.title,
@@ -122,3 +125,141 @@ export const getAllContent = async (req: Request, res: Response) => {
     return;
   }
 };
+
+export const deleteContent = async (req: Request, res: Response) => {
+  try {
+    const userId = req.userId;
+    const contentId = req.params.contentId;
+
+    if (!userId) {
+      res.status(403).json({ message: "Unauthorized access" });
+      return;
+    }
+    const deletedContent = await Content.findOneAndDelete({
+      _id: contentId,
+      userId: userId
+    });
+
+    if (!deletedContent) {
+      res.status(404).json({ message: "Content not found or unauthorized" });
+      return;
+    }
+
+    res.status(200).json({ message: "Content deleted successfully" });
+  } catch (error) {
+    console.log("Error deleting content:", error);
+    res.status(500).json({ message: "Internal server error" });
+    return;
+  }
+}
+
+export const shareBrain = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { share } = req.body;
+    const userId = req.userId;
+    if (!userId) {
+      res.status(403).json({ message: "Unauthorized access" });
+      return;
+    }
+    if (share === undefined) {
+      res.status(400).json({ message: "Share parameter is required" });
+      return;
+    }
+    if (share) {
+      const sharedBrain = await Brain.findOne({ _id: share.brainId, userId: userId });
+
+      if (sharedBrain) {
+        res.status(200).json({ message: "Brain already shared", brainLink: sharedBrain.hash });
+        return;
+      } else {
+        const hash = await generateLink(12);
+        const newBrain = new Brain({
+          userId: userId,
+          hash: hash
+        });
+        await newBrain.save();
+        res.status(201).json({ message: "Brain shared successfully", brainLink: newBrain.hash });
+        return;
+      }
+    } else {
+      await Brain.deleteOne({ userId: userId });
+      res.status(200).json({ message: "Brain unshared successfully" });
+      return;
+    }
+  } catch (error) {
+    console.error("Error sharing brain:", error);
+    res.status(500).json({ message: "Internal server error" });
+    return;
+  }
+}
+
+
+export const accessSharedBrain = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const hash = req.params.hash;
+    if (!hash) {
+      res.status(400).json({ message: "Invalid brain link" });
+      return;
+    }
+    const sharedBrain = await Brain.findOne({ hash: hash });
+    if (!sharedBrain) {
+      res.status(404).json({ message: "Shared brain not found" });
+      return;
+    }
+
+    const brainContent = await Content.find({
+      userId: sharedBrain.userId,
+      public: true
+    })
+      .populate([
+        {
+          path: "tags",
+          select: "tagName -_id"
+        },
+        {
+          path: "userId",
+          select: "username"
+        }
+      ])
+      .exec();
+
+
+    res.status(200).json({ data: brainContent });
+    return;
+
+  } catch (error) {
+    console.error("Error accessing shared brain:", error);
+    res.status(500).json({ message: "Internal server error" });
+    return;
+  }
+}
+
+export const makeContentPublic = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId;
+    if (!userId) {
+      res.status(403).json({ message: "Unauthorized access" });
+      return;
+    }
+    const contentId = req.params.contentId;
+    if (!contentId) {
+      res.status(400).json({ message: "Content ID is required" });
+      return;
+    }
+    const makePublic = req.body.public;
+    if (makePublic) {
+      await Content.updateOne({ _id: contentId, userId: userId }, { public: true });
+      res.status(200).json({ message: "Content made public" });
+      return;
+    }
+    else {
+      await Content.updateOne({ _id: contentId, userId: userId }, { public: false });
+      res.status(200).json({ message: "Content made private" });
+      return;
+    }
+  } catch (error) {
+    console.error("Error updating content visibility:", error);
+    res.status(500).json({ message: "Internal server error" });
+    return;
+  }
+}

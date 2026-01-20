@@ -8,6 +8,7 @@ import cookieParser from "cookie-parser";
 import { connectWithDb } from "./config/db";
 import authRouter from "./routes/authRoutes";
 import contentRouter from "./routes/contentRoutes";
+import shareBrainRouter from "./routes/shareBrain";
 
 dotenv.config();
 
@@ -34,13 +35,14 @@ connectWithDb().catch(err => {
 // Routes
 app.use("/api/v1", authRouter);
 app.use("/api/v1",contentRouter);
+app.use("/api/v1",shareBrainRouter);
 
 
 // Health check
 app.get("/home", (req, res) => {
-  res.send("Radhe Radhe 🙏");
+  res.send("Radhe Radhe");
 });
 
 app.listen(port, () => {
-  console.log(`✅ Server running at http://localhost:${port}`);
+  console.log(`Server running at http://localhost:${port}`);
 });
