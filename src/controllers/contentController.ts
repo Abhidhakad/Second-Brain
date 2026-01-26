@@ -263,3 +263,31 @@ export const makeContentPublic = async (req: Request, res: Response): Promise<vo
     return;
   }
 }
+
+
+export const searchTags = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const searchStr = String(req.query.searchStr || "").trim();
+
+    if (searchStr.length < 2) {
+      res.status(200).json([]);
+      return;
+    }
+
+    console.log("search: ",searchStr);
+
+    const tags = await Tag.find({
+      tagName: { $regex: `^${searchStr}`, $options: "i" },
+    })
+      .limit(5)
+      .select("_id tagName")
+      .lean();
+
+    res.status(200).json(tags);
+    return;
+  } catch (error) {
+    console.error("Error in search tag:", error);
+    res.status(500).json({ message: "Internal server error" });
+    return;
+  }
+}

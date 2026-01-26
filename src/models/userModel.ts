@@ -2,10 +2,8 @@ import mongoose, { Document, Schema, Model } from "mongoose";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 
-
-
 interface IUser {
-  username: string;
+  email: string;
   password: string;
 }
 
@@ -16,12 +14,12 @@ export interface IUserDocument extends IUser, Document {
 
 
 const userSchema = new Schema<IUserDocument>({
-  username: {
+  email: {
     type: String,
     unique: true,
-    required: [true, "Username is required"],
+    required: [true, "email is required"],
     trim: true,
-    maxLength: [50, "Username can not exceed more than 50 characters"],
+    maxLength: [50, "email can not exceed more than 50 characters"],
   },
   password: {
     type: String,

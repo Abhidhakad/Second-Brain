@@ -1,33 +1,34 @@
-import e, { Request, Response } from "express";
+import { Request, Response } from "express";
 import { authSchema } from "../schemas/authSchems";
 import User from "../models/userModel";
 
 
-export const loginUserController = async (req: Request, res: Response):Promise<void> => {
+export const loginUserController = async (req: Request, res: Response): Promise<void> => {
   try {
     const result = authSchema.safeParse(req.body);
-
     if (!result.success) {
       res.status(400).json({
-        message: "Validation failed",
-        errors: result.error.flatten(),
+        success: false,
+        message: "Invalid request data",
+        errors: result.error.flatten().fieldErrors,
       });
       return;
     }
 
-    const { username, password } = result.data;
 
-    const user = await User.findOne({ username });
+    const { email, password } = result.data;
+
+    const user = await User.findOne({ email });
 
     if (!user || !(await user.comparePassword(password))) {
-      res.status(401).json({ message: "Invalid Username or password" });
+      res.status(401).json({ message: "Invalid credentials" });
       return;
     }
     const token = await user.getAuthToken();
     res
       .cookie("token", token, {
         httpOnly: true,
-        maxAge: 7 * 24 * 60 * 60 * 1000, 
+        maxAge: 7 * 24 * 60 * 60 * 1000,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
       })
@@ -43,7 +44,7 @@ export const loginUserController = async (req: Request, res: Response):Promise<v
   }
 };
 
-export const signUpUserController = async (req: Request, res: Response):Promise<void> => {
+export const signUpUserController = async (req: Request, res: Response): Promise<void> => {
   try {
     const result = authSchema.safeParse(req.body);
 
@@ -51,14 +52,14 @@ export const signUpUserController = async (req: Request, res: Response):Promise<
       res.status(411).json({
         success: false,
         message: "Validation failed",
-        errors: result.error.flatten(),
+         errors: result.error.flatten().fieldErrors,
       });
       return;
     }
 
-    const { username, password } = result.data;
+    const { email, password } = result.data;
 
-    const existingUser = await User.findOne({ username });
+    const existingUser = await User.findOne({ email });
     if (existingUser) {
       res.status(403).json({
         success: false,
@@ -68,15 +69,15 @@ export const signUpUserController = async (req: Request, res: Response):Promise<
     }
 
 
-    const user = new User({ username, password });
+    const user = new User({ email, password });
     const userData = await user.save();
 
     if (userData) {
       const token = await userData.getAuthToken();
-      if(!token){
+      if (!token) {
         res.status(405).json({
-          success:false,
-          message:"Auth token problem"
+          success: false,
+          message: "Auth token problem"
         })
       }
       res
@@ -87,7 +88,9 @@ export const signUpUserController = async (req: Request, res: Response):Promise<
           sameSite: "lax",
         })
         .status(201)
-        .json({ message: "User created and logged in successfully" });
+        .json({ 
+          data: userData,
+          message: "User created and logged in successfully" });
     }
 
   } catch (error) {
@@ -99,7 +102,7 @@ export const signUpUserController = async (req: Request, res: Response):Promise<
   }
 };
 
-export const logoutUserController = async (req: Request, res: Response):Promise<void> => {
+export const logoutUserController = async (req: Request, res: Response): Promise<void> => {
   try {
     res
       .clearCookie("token", {
@@ -118,7 +121,7 @@ export const logoutUserController = async (req: Request, res: Response):Promise<
   }
 };
 
-export const changePasswordController = async (req: Request, res: Response):Promise<void> => {
+export const changePasswordController = async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.userId;
     const { oldPassword, newPassword } = req.body;
@@ -146,7 +149,7 @@ export const changePasswordController = async (req: Request, res: Response):Prom
   }
 }
 
-export const getUserProfileController = async (req: Request, res: Response):Promise<void> => {
+export const getUserProfileController = async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.userId;
     if (!userId) {
@@ -161,12 +164,12 @@ export const getUserProfileController = async (req: Request, res: Response):Prom
     res.status(200).json({ user });
   } catch (error) {
     console.error("Error in get user profile controller:", error);
-    res.status(500).json({ message: "Something went wrong. Please try again later." }); 
+    res.status(500).json({ message: "Something went wrong. Please try again later." });
     return;
   }
 }
 
-export const deleteUserController = async (req: Request, res: Response):Promise<void> => { 
+export const deleteUserController = async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.userId;
     if (!userId) {

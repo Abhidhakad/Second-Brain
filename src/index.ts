@@ -33,7 +33,7 @@ connectWithDb().catch(err => {
 });
 
 // Routes
-app.use("/api/v1", authRouter);
+app.use("/api/v1/auth", authRouter);
 app.use("/api/v1",contentRouter);
 app.use("/api/v1",shareBrainRouter);
 
