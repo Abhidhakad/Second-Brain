@@ -5,32 +5,10 @@ import { Tag, Brain } from "../models/contentModel"
 import mongoose, { Types } from "mongoose";
 import { ContentInput, contentSchema } from "../schemas/contentSchema";
 import { generateLink } from "../utils/generateHash";
+import { detectLinkType } from "../utils/detectLinkType";
+import { link } from "fs";
 
 
-
-// const detectLinkType = (link: string): string => {
-//   try {
-//     const parsedUrl = new URL(link)
-//     const hostName = parsedUrl.hostname;
-//     if (hostName.includes("youtube.com") || hostName.includes("youtu.be")) {
-//       return "youtube"
-//     } else if (hostName.includes("x.com")) {
-//       return "twitter";
-//     } else if (hostName.includes("facebook.com")) {
-//       return "facebook";
-//     } else if (hostName.includes("linkedin.com")) {
-//       return "linkedIn";
-//     } else if (hostName.includes("github.com")) {
-//       return "gitHub";
-//     } else if (hostName.includes("reddit.com")) {
-//       return "reddit";
-//     } else {
-//       return "other"
-//     }
-//   } catch (error) {
-//     return "Invalid URL";
-//   }
-// }
 
 
 
@@ -55,6 +33,8 @@ export const createContent = async (req: Request, res: Response): Promise<void> 
 
     const data: ContentInput = result.data;
 
+    const linkType = detectLinkType(data.link); 
+
     session.startTransaction();
 
     const tagIds: Types.ObjectId[] = []
@@ -68,14 +48,14 @@ export const createContent = async (req: Request, res: Response): Promise<void> 
       );
       tagIds.push(tag._id);
     }
-    const [newContent] = await Content.create(
+    const [created] = await Content.create(
       [
         {
           title: data.title,
           description: data.description,
           link: data.link,
           tags: tagIds,
-          type: data.type,
+          type: linkType,
           userId: new mongoose.Types.ObjectId(req.userId),
         },
       ],
@@ -85,15 +65,24 @@ export const createContent = async (req: Request, res: Response): Promise<void> 
     await session.commitTransaction();
     session.endSession();
 
+    const newContent = await Content.findById(created._id)
+      .populate({
+        path: "tags",
+        select: "tagName",
+      })
+      .select("-__v")
+      .lean();
+
     if (!newContent) {
       res.status(422).json({
         message: "Internal server error!"
       })
       return;
     }
-
-    res.status(201).json({ message: "Content created", content: newContent });
-
+    res.status(201).json({
+      message: "Content created",
+      data: newContent,
+    });
   } catch (error) {
     console.error("Error creating content:", error);
     await session.abortTransaction();
@@ -103,7 +92,10 @@ export const createContent = async (req: Request, res: Response): Promise<void> 
 
 }
 
-export const getAllContent = async (req: Request, res: Response) => {
+export const getAllContent = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   try {
     const userId = req.userId;
 
@@ -112,19 +104,25 @@ export const getAllContent = async (req: Request, res: Response) => {
       return;
     }
 
-    const allContent = await Content.find({ userId: userId }).populate({ path: "tags", select: "tagName -_id" }).exec()
+    const contents = await Content.find({ userId })
+      .populate({
+        path: "tags",
+        select: "_id tagName",
+      })
+      .select("-__v")
+      .sort({ createdAt: -1 })
+      .lean();
 
-    if (allContent.length === 0) {
-      res.status(404).json({ message: "No content found" });
-      return;
-    }
-    res.status(200).json({ data: allContent });
+    res.status(200).json({
+      data: contents,
+    });
+
   } catch (error) {
     console.error("Error fetching content:", error);
     res.status(500).json({ message: "Internal server error" });
-    return;
   }
 };
+
 
 export const deleteContent = async (req: Request, res: Response) => {
   try {
@@ -274,7 +272,7 @@ export const searchTags = async (req: Request, res: Response): Promise<void> => 
       return;
     }
 
-    console.log("search: ",searchStr);
+    console.log("search: ", searchStr);
 
     const tags = await Tag.find({
       tagName: { $regex: `^${searchStr}`, $options: "i" },

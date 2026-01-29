@@ -1,12 +1,13 @@
 import mongoose from "mongoose";
 
-
 export enum ContentType {
     DOCUMENT = "document",
-    TWEET = "tweet",
     YOUTUBE = "youtube",
-    LINK = "link",
-    OTHERS = "others",
+    TWITTER = "twitter",
+    Linkedin = "linkedin",
+    GITHUB = "github",
+    REDDIT = "reddit",
+    OTHERS = "other",
 }
 
 
