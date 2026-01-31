@@ -1,4 +1,3 @@
-
 import { Response, Request } from "express";
 import Content from "../models/contentModel"
 import { Tag, Brain } from "../models/contentModel"
@@ -6,8 +5,12 @@ import mongoose, { Types } from "mongoose";
 import { ContentInput, contentSchema } from "../schemas/contentSchema";
 import { generateLink } from "../utils/generateHash";
 import { detectLinkType } from "../utils/detectLinkType";
-import { link } from "fs";
-
+import { openai } from "../config/openAiConfig";
+import { analyzeContentSchema } from "../schemas/contentSchema";
+import { buildAnalyzePrompt } from "../utils/buildPrompt";
+import { AIAnalysisResult } from "../types/ai.types";
+import { AIResultSchema } from "../schemas/contentSchema"
+import { mockAIResult } from "../utils/mock";
 
 
 
@@ -33,7 +36,7 @@ export const createContent = async (req: Request, res: Response): Promise<void> 
 
     const data: ContentInput = result.data;
 
-    const linkType = detectLinkType(data.link); 
+    const linkType = detectLinkType(data.link);
 
     session.startTransaction();
 
@@ -123,7 +126,6 @@ export const getAllContent = async (
   }
 };
 
-
 export const deleteContent = async (req: Request, res: Response) => {
   try {
     const userId = req.userId;
@@ -190,7 +192,6 @@ export const shareBrain = async (req: Request, res: Response): Promise<void> => 
     return;
   }
 }
-
 
 export const accessSharedBrain = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -262,7 +263,6 @@ export const makeContentPublic = async (req: Request, res: Response): Promise<vo
   }
 }
 
-
 export const searchTags = async (req: Request, res: Response): Promise<void> => {
   try {
     const searchStr = String(req.query.searchStr || "").trim();
@@ -287,5 +287,83 @@ export const searchTags = async (req: Request, res: Response): Promise<void> => 
     console.error("Error in search tag:", error);
     res.status(500).json({ message: "Internal server error" });
     return;
+  }
+}
+
+export const analyzeContent = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const parsed = analyzeContentSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid request body" });
+      return;
+    }
+
+    const { contentId } = parsed.data;
+
+    const content = await Content.findById(contentId)
+      .populate("tags", "tagName")
+      .select("-type -userId -public -createdAt -updatedAt")
+      .lean();
+
+
+    if (!content) {
+      res.status(404).json({ error: "Content not found" });
+      return;
+    }
+    const normalizedContent = {
+      title: content.title,
+      description: content.description,
+      link: content.link,
+      tags: content.tags?.length ? content.tags.map((tag: any) => tag.tagName) : [],
+    };
+
+    // Mock AI response is used in development to avoid paid external dependency 😒
+    // (Yes, this is a side-project reality 😅)
+
+    if (process.env.AI_MODE === "mock") {
+      res.json({
+        success: true,
+        data: mockAIResult,
+        source: "mock",
+      });
+      return;
+    }
+
+    const prompt = buildAnalyzePrompt(normalizedContent);
+
+    const completion = await openai.chat.completions.create(
+      {
+        model: "gpt-4.1-mini",
+        temperature: 0.3,
+        messages: [
+          { role: "system", content: "You are a strict JSON-only API." },
+          { role: "user", content: prompt },
+        ],
+      },
+      { timeout: 15_000 }
+    );
+
+    const raw = completion.choices[0]?.message?.content;
+    if (!raw) throw new Error("Empty AI response");
+
+    let aiResult: AIAnalysisResult;
+    try {
+      aiResult = AIResultSchema.parse(JSON.parse(raw));
+    } catch {
+      throw new Error("Invalid JSON from AI");
+    }
+
+    res.json({
+      success: true,
+      data: aiResult,
+    });
+    return;
+  } catch (error) {
+    console.error("AI ERROR:", error);
+    res.status(500).json({
+      success: false,
+      error: "AI analysis failed",
+    });
+    return
   }
 }

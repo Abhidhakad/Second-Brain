@@ -1,5 +1,5 @@
 import express from "express";
-import {createContent, getAllContent,deleteContent,makeContentPublic,searchTags} from "../controllers/contentController";
+import {createContent, getAllContent,deleteContent,makeContentPublic,searchTags,analyzeContent} from "../controllers/contentController";
 import {verifyToken} from "../middlewares/authMiddleware"
 
 
@@ -13,5 +13,8 @@ contentRouter.post("/content/:contentId",verifyToken,makeContentPublic);
 
 // Tag search route
 contentRouter.get("/search-tag",verifyToken,searchTags);
+
+//OpenAi routes
+contentRouter.post("/ai/analyze-content",verifyToken,analyzeContent);
 
 export default contentRouter;
